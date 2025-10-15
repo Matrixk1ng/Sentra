@@ -1,0 +1,19 @@
+# Node / Frontend
+node_modules/
+.next/
+out/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Env & OS
+.env
+.DS_Store
+.vscode/
+
+# Builds
+dist/
+build/
+.cache/
