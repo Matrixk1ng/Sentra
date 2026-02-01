@@ -1,78 +1,291 @@
 # Sentra
-🚀 Overview
-Social Media Sentiment is an analytics platform designed to measure and visualize sentiment trends from platforms such as X (Twitter), Reddit, and YouTube.
-It leverages AI-driven natural language processing (NLP) to classify public opinion on trending topics, brands, and events — in real time.
 
-The goal is to help users, researchers, and organizations understand how the internet feels about anything — instantly.
+A social media sentiment analysis dashboard that aggregates posts from Reddit and YouTube, analyzes sentiment using AI, and visualizes trends in real-time.
 
-🧩 Features
+## Features
 
-🔍 Multi-platform Sentiment Analysis – Aggregate posts from Twitter/X, Reddit, and YouTube comments.
+- **Multi-platform Analysis** – Fetch posts from Reddit and YouTube comments
+- **AI-Powered Sentiment** – Uses HuggingFace's RoBERTa model for accurate classification
+- **Interactive Dashboard** – Pie charts, trend lines, and filterable post lists
+- **Historical Tracking** – View sentiment changes over time
+- **Rate Limiting & Caching** – Built-in protections against API abuse
 
-💬 AI-Based Classification – Uses transformer models to classify sentiments as Positive, Negative, or Neutral.
+## Tech Stack
 
-📊 Data Visualization Dashboard – Interactive graphs to display sentiment distribution and trend shifts.
+| Layer | Technology |
+|-------|------------|
+| Frontend | Next.js 14 (App Router) + Tailwind CSS + shadcn/ui |
+| Backend | FastAPI (Python) |
+| Database | PostgreSQL |
+| AI/NLP | HuggingFace Transformers (cardiffnlp/twitter-roberta-base-sentiment) |
+| Charts | Recharts |
+| Containerization | Docker & Docker Compose |
 
-⚙️ Custom Topic Tracking – Input any hashtag, keyword, or phrase and view live sentiment results.
+---
 
-💾 Historical Data Comparison – Track how sentiment evolves over time.
+## First-Time Setup
 
-🌐 API Integration Ready – Modular backend design for easy integration into other tools or dashboards.
+### Prerequisites
 
-🏗️ Tech Stack
-Layer	Technology
-Frontend	React / Next.js with Tailwind CSS
-Backend	FastAPI (Python) or Node.js Express
-Database	PostgreSQL (via Prisma ORM)
-AI/NLP	HuggingFace Transformers (BERT / RoBERTa sentiment models)
-Containerization	Docker & Docker Compose
-Deployment	Render / AWS EC2 / Railway (configurable)
-🧰 Setup & Installation
-# 1. Clone the repository
-git clone https://github.com/<your-username>/social-media-sentiment.git
+Make sure you have installed:
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (includes Docker Compose)
+- [Git](https://git-scm.com/downloads)
 
-# 2. Navigate to the project folder
-cd social-media-sentiment
+### Step 1: Clone the Repository
 
-# 3. Start Docker containers (for DB + API)
-docker-compose up -d
+```bash
+git clone https://github.com/your-username/Sentra.git
+cd Sentra
+```
 
-# 4. Install dependencies (frontend/backend)
-npm install
-# or
+### Step 2: Configure Environment Variables
+
+Copy the example environment file:
+
+```bash
+cp .env.example .env
+```
+
+Edit the `.env` file and add your API credentials:
+
+```env
+DATABASE_URL=postgresql://postgres:postgres@db:5432/sentra
+REDDIT_CLIENT_ID=your_reddit_client_id
+REDDIT_CLIENT_SECRET=your_reddit_client_secret
+REDDIT_USER_AGENT=sentra:v1.0.0
+YOUTUBE_API_KEY=your_youtube_api_key
+```
+
+### Step 3: Get API Credentials
+
+#### Reddit API (Free)
+
+1. Go to https://www.reddit.com/prefs/apps
+2. Click "Create App" or "Create Another App"
+3. Fill in:
+   - **Name**: Sentra
+   - **App type**: Select "script"
+   - **Redirect URI**: http://localhost:8000
+4. Click "Create app"
+5. Copy the **client ID** (under the app name) and **secret**
+
+#### YouTube Data API (Free - 10,000 units/day)
+
+1. Go to https://console.cloud.google.com/
+2. Create a new project (or select existing)
+3. Enable the "YouTube Data API v3"
+4. Go to "Credentials" → "Create Credentials" → "API Key"
+5. Copy the API key
+
+> **Note**: The app works without API keys, but you won't be able to fetch data from those sources.
+
+### Step 4: Build and Start Services
+
+```bash
+docker-compose up --build
+```
+
+This will:
+- Start PostgreSQL database
+- Build and start the FastAPI backend (downloads AI model on first run ~500MB)
+- Build and start the Next.js frontend
+
+**First startup takes 5-10 minutes** due to:
+- Downloading the sentiment analysis model
+- Installing dependencies
+- Building the frontend
+
+### Step 5: Initialize the Database
+
+Once services are running, run Prisma migrations:
+
+```bash
+docker-compose exec frontend npx prisma db push
+```
+
+### Step 6: Verify Setup
+
+Open your browser and check:
+
+| Service | URL | Expected |
+|---------|-----|----------|
+| Frontend | http://localhost:3000 | Dashboard UI |
+| Backend Health | http://localhost:8000/health | JSON with status |
+| API Docs | http://localhost:8000/docs | Swagger UI |
+
+The health endpoint should show:
+```json
+{
+  "status": "ok",
+  "database": "connected",
+  "sentimentModel": "loaded",
+  "reddit": "configured",
+  "youtube": "configured"
+}
+```
+
+---
+
+## Usage
+
+1. **Search**: Enter a keyword (e.g., "ChatGPT", "climate change", "Tesla")
+2. **Select Source**: Choose Reddit, YouTube, or All
+3. **Analyze**: View sentiment distribution and individual posts
+4. **Filter**: Filter posts by sentiment type
+5. **Track**: Search the same keyword over time to build history
+
+---
+
+## Development
+
+### Running Locally (without Docker)
+
+#### Backend
+
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
 
-# 5. Run the app locally
+#### Frontend
+
+```bash
+cd frontend
+npm install
+npx prisma generate
 npm run dev
-# or
-uvicorn main:app --reload
+```
 
+### Useful Commands
 
-The app should now be live on
-👉 http://localhost:3000 for frontend
-👉 http://localhost:8000 for backend API
+```bash
+# View logs
+docker-compose logs -f
 
-📈 Example Workflow
+# View specific service logs
+docker-compose logs -f backend
 
-Enter a keyword or hashtag (e.g. “#AI”, “Tesla”, “Elections 2025”).
+# Restart a service
+docker-compose restart backend
 
-The system fetches recent posts from connected APIs.
+# Stop all services
+docker-compose down
 
-AI models analyze text and classify sentiment.
+# Stop and remove volumes (reset database)
+docker-compose down -v
 
-The frontend displays a sentiment pie chart + trendline over time.
+# Rebuild after code changes
+docker-compose up --build
+```
 
-🧪 Development Notes
+### Database Management
 
-Designed for extensibility — easily add new platforms or ML models.
+```bash
+# Open Prisma Studio (GUI for database)
+docker-compose exec frontend npx prisma studio
 
-Dockerized for consistent local and production environments.
+# Reset database
+docker-compose exec frontend npx prisma db push --force-reset
+```
 
-Future iterations will include:
+---
 
-🧵 Threaded discussion analysis (contextual sentiment)
+## API Endpoints
 
-🗺️ Geo-based sentiment mapping
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Service health check |
+| `/analyze` | POST | Analyze single text |
+| `/analyze/batch` | POST | Analyze multiple texts |
+| `/search` | GET | Search and analyze from sources |
+| `/history` | GET | Get historical sentiment data |
 
-🧬 Custom fine-tuning pipeline for domain-specific topics
+### Example API Calls
 
+```bash
+# Health check
+curl http://localhost:8000/health
+
+# Analyze single text
+curl -X POST http://localhost:8000/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"text": "I love this product!"}'
+
+# Search Reddit for a keyword
+curl "http://localhost:8000/search?q=python&source=reddit"
+
+# Get 7-day history
+curl "http://localhost:8000/history?q=python&days=7"
+```
+
+---
+
+## Troubleshooting
+
+### "Sentiment model not loaded"
+
+The model downloads on first startup. Wait a few minutes and check logs:
+```bash
+docker-compose logs -f backend
+```
+
+### "Database connection failed"
+
+Ensure PostgreSQL is running:
+```bash
+docker-compose ps
+```
+
+### "Reddit/YouTube not configured"
+
+Add API credentials to `.env` and restart:
+```bash
+docker-compose down
+docker-compose up
+```
+
+### Frontend not connecting to backend
+
+Check that `NEXT_PUBLIC_API_URL` is set in `frontend/.env.local`:
+```
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
+
+### Port already in use
+
+Stop other services using the ports or change ports in `docker-compose.yml`:
+- Frontend: 3000
+- Backend: 8000
+- PostgreSQL: 5432
+
+---
+
+## Project Structure
+
+```
+sentra/
+├── docker-compose.yml      # Container orchestration
+├── .env.example            # Environment template
+├── frontend/               # Next.js application
+│   ├── src/
+│   │   ├── app/           # Pages and API routes
+│   │   ├── components/    # React components
+│   │   ├── lib/           # Utilities and API client
+│   │   └── types/         # TypeScript types
+│   └── prisma/            # Database schema
+└── backend/                # FastAPI application
+    ├── main.py            # Application entry
+    └── app/
+        ├── routers/       # API endpoints
+        ├── services/      # Business logic
+        └── models/        # Pydantic schemas
+```
+
+---
+
+## License
+
+MIT License - feel free to use this project for learning or commercial purposes.

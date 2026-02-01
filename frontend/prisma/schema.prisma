@@ -1,0 +1,41 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Search {
+  id        String   @id @default(cuid())
+  keyword   String
+  createdAt DateTime @default(now())
+  posts     Post[]
+}
+
+model Post {
+  id         String   @id @default(cuid())
+  searchId   String
+  search     Search   @relation(fields: [searchId], references: [id])
+  text       String
+  source     String   // "reddit" | "youtube"
+  sentiment  String   // "positive" | "negative" | "neutral"
+  score      Float
+  authorName String?
+  sourceUrl  String?
+  createdAt  DateTime @default(now())
+
+  @@index([searchId])
+}
+
+model SentimentHistory {
+  id            String   @id @default(cuid())
+  keyword       String
+  date          DateTime
+  positiveCount Int
+  negativeCount Int
+  neutralCount  Int
+
+  @@unique([keyword, date])
+}
