@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     reddit_client_id: str = ""
     reddit_client_secret: str = ""
     reddit_user_agent: str = "sentra:v1.0.0"
+
+    # Bluesky credentials
+    bluesky_handle: str = ""
+    bluesky_app_password: str = ""
     
     # YouTube API
     youtube_api_key: str = ""

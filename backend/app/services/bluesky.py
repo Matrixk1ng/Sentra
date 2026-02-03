@@ -1,49 +1,91 @@
-import requests
+from atproto import Client
+from app.config import get_settings
 
-# 1. Setup your credentials
-handle = "matrixking1.bsky.social"
-app_password = "flame86362"  # It is safer to use an App Password!
-base_url = "https://bsky.social/xrpc"
+class BlueskyService:
+    """
+    Bluesky data fetching service using the official API.
+    Fetches posts and comments related to a search keyword.
+    """
+    def __init__(self):
+        self._client = None
+        self._is_configured = False
 
-# 2. Create a Session (Login)
-
-class BleuSkyService:
-    def get_access_token():
-        print("Authenticating...")
-        resp = requests.post(
-            f"{base_url}/com.atproto.server.createSession",
-            json={"identifier": handle, "password": app_password}
-        )
-        resp.raise_for_status()
-        return resp.json()["accessJwt"]
-
-    # 3. Search for Posts
-    def search_posts(token, query):
-        print(f"Searching for: {query}...")
-        headers = {"Authorization": f"Bearer {token}"}
-        params = {
-            "q": query,
-            "lang": "en",
-            "limit": 10
-        }
+    def initialize(self) -> bool:
+        """
+        Initialize the Bluesky client.
         
-        # We use the public API endpoint for search as it's optimized for it
-        search_url = "https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts"
-        
-        resp = requests.get(search_url, headers=headers, params=params)
-        resp.raise_for_status()
-        return resp.json().get("posts", [])
+        Returns:
+            True if successfully configured, False otherwise
+        """
+        settings = get_settings()
 
-    # --- Execute ---
-    def get_posts(self):
+        if not settings.bluesky_handle or not settings.bluesky_app_password:
+            logger.warning("Bluesky credentials not configured")
+            self._is_configured = False
+            return False
         try:
-            jwt = self.get_access_token()
-            results = self.search_posts(jwt, "epstein")
-
-            for post in results:
-                author = post['author']['handle']
-                text = post['record']['text']
-                print(f"[@{author}]: {text}\n{'-'*40}")
-
+            self._client = Client()
+            self._client.login(settings.bluesky_handle, settings.bluesky_app_password)
+            self._is_configured = True
+            logger.info("Bluesky client initialized successfully")
+            return True
         except Exception as e:
-            print(f"Error occurred: {e}")
+            logger.error(f"Failed to initialize Bluesky client: {e}")
+            self._is_configured = False
+            return False
+    
+    @property
+    def is_configured(self) -> bool:
+        """Check if bluesky API is configured."""
+        return self._is_configured
+
+    def search(self, query, limit=50):
+        """
+        Search Bluesky for posts related to a search keyword.
+        
+        Args:
+            query: The search term
+            limit: Maximum number of posts to fetch (default 50)
+            
+        Returns:
+            List of normalized post dictionaries
+        """
+        if not self._is_configured:
+            logger.warning("Bluesky API not configured, skipping search")
+            return []
+        try:
+            response = self.client.app.bsky.feed.search_posts(
+                params={"q": query, "limit": min(limit, 100)}  # API max is 100
+            )
+            bluesky_posts_urls = []
+            for post in response.posts:
+                bluesky_posts_urls.append(post.uri)
+            bluesky_posts_threads = []
+            for url in bluesky_posts_urls:
+                response = self.client.app.bsky.feed.get_post_thread(
+                    params={"uri": url, "depth": 10}
+                )
+                for post in response.thread:
+                    bluesky_posts_threads.append({
+                        "text": post.record.text,
+                        "authorName": f"@{post.author.handle}",
+                        "sourceUrl": url,
+                        "source": "bluesky"
+                    })
+            # Return normalized format (match your YouTube structure)
+            return [{
+                "text": post.record.text,
+                "authorName": f"@{post.author.handle}",
+                "sourceUrl": f"https://bsky.app/profile/{post.author.handle}/post/{post.uri.split('/')[-1]}",
+                "source": "bluesky"
+            } for post in response.posts]
+        except Exception as e:
+            logger.error(f"Failed to search Bluesky: {e}")
+            return []
+    
+    # For replies/thread
+    def get_thread(self, post_uri):
+        response = self.client.app.bsky.feed.get_post_thread(
+            params={"uri": post_uri, "depth": 10}
+        )
+        return response.thread
