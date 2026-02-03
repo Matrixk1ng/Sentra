@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from app.config import get_settings, Settings
 from app.services.reddit import reddit_service
 from app.services.youtube import youtube_service
+from app.services.bluesky import bluesky_service
 
 router = APIRouter(tags=["health"])
 
@@ -40,4 +41,5 @@ async def health_check(request: Request, settings: Settings = Depends(get_settin
         "sentimentModel": "loaded" if model_loaded else "not_loaded",
         "reddit": "configured" if reddit_service.is_configured else "not_configured",
         "youtube": "configured" if youtube_service.is_configured else "not_configured",
+        "bluesky": "configured" if bluesky_service.is_configured else "not_configured",
     }

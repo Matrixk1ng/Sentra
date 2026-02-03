@@ -8,7 +8,7 @@ from app.services.sentiment import sentiment_analyzer
 from app.services.database import db_service
 from app.services.reddit import reddit_service
 from app.services.youtube import youtube_service
-
+from app.services.bluesky import bluesky_service
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -54,8 +54,15 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Failed to initialize YouTube service: {e}")
     
-    logger.info("Sentra API ready to serve requests")
+    # Initialize Bluesky service
+    try:
+        bluesky_service.initialize()
+    except Exception as e:
+        logger.error(f"Failed to initialize Bluesky service: {e}")
     
+    logger.info("Sentra API ready to serve requests")
+
+
     yield
     
     # Shutdown: Cleanup

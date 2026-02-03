@@ -58,6 +58,7 @@ export function SearchBar({ onSearch, isLoading }: SearchBarProps) {
           <SelectItem value="all" className="text-[#fafafa] focus:bg-[#262626]">All Sources</SelectItem>
           <SelectItem value="reddit" className="text-[#fafafa] focus:bg-[#262626]">Reddit</SelectItem>
           <SelectItem value="youtube" className="text-[#fafafa] focus:bg-[#262626]">YouTube</SelectItem>
+          <SelectItem value="bluesky" className="text-[#fafafa] focus:bg-[#262626]">Bluesky</SelectItem>
         </SelectContent>
       </Select>
 

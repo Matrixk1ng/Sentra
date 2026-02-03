@@ -17,7 +17,7 @@ export function PostCard({ post }: PostCardProps) {
   const displayText = isExpanded ? post.text : truncateText(post.text, 280);
 
   const sentimentVariant = post.sentiment as 'positive' | 'negative' | 'neutral';
-  const sourceVariant = post.source as 'reddit' | 'youtube';
+  const sourceVariant = post.source as 'reddit' | 'youtube' | 'bluesky';
 
   return (
     <Card className="bg-[#141414] border-[#262626] hover:border-[#363636] transition-colors">

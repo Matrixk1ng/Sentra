@@ -25,6 +25,8 @@ const badgeVariants = cva(
           "border-transparent bg-orange-500/10 text-orange-500 hover:bg-orange-500/20",
         youtube:
           "border-transparent bg-red-600/10 text-red-500 hover:bg-red-600/20",
+        bluesky:
+          "border-transparent bg-blue-500/10 text-blue-500 hover:bg-blue-500/20",
       },
     },
     defaultVariants: {

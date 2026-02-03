@@ -3,7 +3,7 @@
 export interface Post {
   id: string;
   text: string;
-  source: 'reddit' | 'youtube';
+  source: 'reddit' | 'youtube' | 'bluesky';
   sentiment: 'positive' | 'negative' | 'neutral';
   score: number;
   authorName?: string;
@@ -48,7 +48,7 @@ export interface HistoryResponse {
 
 // UI State Types
 
-export type SourceType = 'all' | 'reddit' | 'youtube';
+export type SourceType = 'all' | 'reddit' | 'youtube' | 'bluesky';
 export type SentimentFilter = 'all' | 'positive' | 'negative' | 'neutral';
 export type SortOption = 'recent' | 'score';
 

@@ -1,5 +1,7 @@
 from atproto import Client
+import logging
 from app.config import get_settings
+logger = logging.getLogger(__name__)
 
 class BlueskyService:
     """
@@ -42,50 +44,57 @@ class BlueskyService:
     def search(self, query, limit=50):
         """
         Search Bluesky for posts related to a search keyword.
-        
-        Args:
-            query: The search term
-            limit: Maximum number of posts to fetch (default 50)
-            
-        Returns:
-            List of normalized post dictionaries
         """
         if not self._is_configured:
             logger.warning("Bluesky API not configured, skipping search")
             return []
+         
+        results = []
         try:
-            response = self.client.app.bsky.feed.search_posts(
-                params={"q": query, "limit": min(limit, 100)}  # API max is 100
+            response = self._client.app.bsky.feed.search_posts(
+                params={"q": query, "limit": min(limit, 100), "lang": "en"}
             )
-            bluesky_posts_urls = []
+            
             for post in response.posts:
-                bluesky_posts_urls.append(post.uri)
-            bluesky_posts_threads = []
-            for url in bluesky_posts_urls:
-                response = self.client.app.bsky.feed.get_post_thread(
-                    params={"uri": url, "depth": 10}
-                )
-                for post in response.thread:
-                    bluesky_posts_threads.append({
-                        "text": post.record.text,
-                        "authorName": f"@{post.author.handle}",
-                        "sourceUrl": url,
-                        "source": "bluesky"
-                    })
-            # Return normalized format (match your YouTube structure)
-            return [{
-                "text": post.record.text,
-                "authorName": f"@{post.author.handle}",
-                "sourceUrl": f"https://bsky.app/profile/{post.author.handle}/post/{post.uri.split('/')[-1]}",
-                "source": "bluesky"
-            } for post in response.posts]
+                # Add the main post
+                results.append({
+                    "text": post.record.text,
+                    "authorName": f"@{post.author.handle}",
+                    "sourceUrl": f"https://bsky.app/profile/{post.author.handle}/post/{post.uri.split('/')[-1]}",
+                    "createdAt": getattr(post.record, 'created_at', None),
+                    "source": "bluesky"
+                })
+                
+                # Fetch replies for this post
+                try:
+                    thread_response = self._client.app.bsky.feed.get_post_thread(
+                        params={"uri": post.uri, "depth": 5}
+                    )
+                    thread = thread_response.thread
+                    
+                    if hasattr(thread, 'replies') and thread.replies:
+                        for reply in thread.replies:
+                            if reply is None:
+                                continue
+                            if hasattr(reply, 'notFound') or hasattr(reply, 'blocked'):
+                                continue
+                            if hasattr(reply, 'post'):
+                                results.append({
+                                    "text": reply.post.record.text,
+                                    "authorName": f"@{reply.post.author.handle}",
+                                    "sourceUrl": f"https://bsky.app/profile/{reply.post.author.handle}/post/{reply.post.uri.split('/')[-1]}",
+                                    "createdAt": getattr(reply.post.record, 'created_at', None),
+                                    "source": "bluesky"
+                                })
+                except Exception as e:
+                    logger.debug(f"Could not fetch thread for {post.uri}: {e}")
+                    continue
+            
+            logger.info(f"Fetched {len(results)} posts/replies from Bluesky for keyword: {query}")
+            return results
+        
         except Exception as e:
             logger.error(f"Failed to search Bluesky: {e}")
             return []
-    
-    # For replies/thread
-    def get_thread(self, post_uri):
-        response = self.client.app.bsky.feed.get_post_thread(
-            params={"uri": post_uri, "depth": 10}
-        )
-        return response.thread
+
+bluesky_service = BlueskyService()

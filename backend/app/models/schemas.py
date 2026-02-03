@@ -8,6 +8,7 @@ class SourceType(str, Enum):
     """Supported data sources."""
     REDDIT = "reddit"
     YOUTUBE = "youtube"
+    BLUESKY = "bluesky"
     ALL = "all"
 
 

@@ -15,6 +15,7 @@ from app.models.schemas import (
 from app.services.database import db_service
 from app.services.reddit import reddit_service
 from app.services.youtube import youtube_service
+from app.services.bluesky import bluesky_service
 from app.services.rate_limiter import rate_limiter, search_cache
 
 logger = logging.getLogger(__name__)
@@ -101,6 +102,18 @@ async def search_posts(
                 errors.append(f"YouTube: {str(e)}")
         else:
             errors.append("YouTube: API not configured")
+    if source in (SourceType.BLUESKY, SourceType.ALL):
+        if bluesky_service.is_configured:
+            try:
+                bluesky_posts = bluesky_service.search(keyword, limit=10)
+                for post in bluesky_posts:
+                    post['source'] = 'bluesky'
+                raw_posts.extend(bluesky_posts)
+            except Exception as e:
+                logger.error(f"Bluesky fetch error: {e}")
+                errors.append(f"Bluesky: {str(e)}")
+        else:
+            errors.append("Bluesky: API not configured")
     
     # Check if we got any posts
     if not raw_posts:
