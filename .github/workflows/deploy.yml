@@ -1,0 +1,97 @@
+name: Deploy to AWS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # Allow manual trigger
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push frontend
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/sentra-frontend:latest \
+                       -t $ECR_REGISTRY/sentra-frontend:$IMAGE_TAG \
+                       frontend/
+          docker push $ECR_REGISTRY/sentra-frontend:latest
+          docker push $ECR_REGISTRY/sentra-frontend:$IMAGE_TAG
+
+      - name: Build and push backend
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/sentra-backend:latest \
+                       -t $ECR_REGISTRY/sentra-backend:$IMAGE_TAG \
+                       backend/
+          docker push $ECR_REGISTRY/sentra-backend:latest
+          docker push $ECR_REGISTRY/sentra-backend:$IMAGE_TAG
+
+      - name: Deploy to EC2
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          # Setup SSH key
+          echo "$SSH_PRIVATE_KEY" > private_key.pem
+          chmod 600 private_key.pem
+          
+          # Deploy on EC2
+          ssh -o StrictHostKeyChecking=no -i private_key.pem ec2-user@$EC2_HOST << 'ENDSSH'
+            set -e
+            cd /home/ec2-user/sentra
+            
+            # Login to ECR
+            aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $(aws sts get-caller-identity --query Account --output text).dkr.ecr.us-east-1.amazonaws.com
+            
+            # Pull and restart
+            docker-compose pull
+            docker-compose down
+            docker-compose up -d
+            
+            # Cleanup
+            docker system prune -f
+            
+            echo "Deployment complete"
+          ENDSSH
+          
+          # Cleanup
+          rm -f private_key.pem
+
+      - name: Health check
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+        run: |
+          echo "Waiting for services to start..."
+          sleep 60
+          
+          echo "Checking health endpoint..."
+          curl -f http://$EC2_HOST:8000/health || {
+            echo "Health check failed!"
+            exit 1
+          }
+          
+          echo "✓ Deployment successful!"
