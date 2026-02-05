@@ -23,11 +23,11 @@ A social media sentiment analysis dashboard that aggregates posts from Reddit an
 
 ---
 
-## First-Time Setup
+## Setup
 
 ### Prerequisites
 
-Make sure you have installed:
+
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (includes Docker Compose)
 - [Git](https://git-scm.com/downloads)
 
