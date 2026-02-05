@@ -44,9 +44,11 @@ resource "aws_instance" "sentra" {
   key_name               = var.key_name
   vpc_security_group_ids = [aws_security_group.sentra.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
+  associate_public_ip_address = true  
+  subnet_id                   = data.aws_subnet.default.id  
 
   root_block_device {
-    volume_size = 20 # Free tier: up to 30GB
+    volume_size = 30 # Free tier: up to 30GB
     volume_type = "gp2"
   }
 
@@ -59,6 +61,7 @@ resource "aws_instance" "sentra" {
     reddit_client_id     = var.reddit_client_id
     reddit_client_secret = var.reddit_client_secret
     postgres_password    = var.postgres_password
+    SWAP_SIZE_GB         = 2
   }))
 
   tags = {

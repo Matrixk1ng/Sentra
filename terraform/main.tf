@@ -7,7 +7,7 @@ terraform {
     }
   }
   backend "s3" {
-    bucket  = "sentra-tfstate-ACCOUNT_ID"
+    bucket  = "sentra-tfstate-105526220163"
     key     = "terraform.tfstate"
     region  = "us-east-1"
     encrypt = true
@@ -32,6 +32,17 @@ data "aws_ami" "amazon_linux" {
     name   = "name"
     values = ["al2023-ami-*-x86_64"]
   }
+}
+# Get default VPC
+data "aws_vpc" "default" {
+  default = true
+}
+
+# Get a public subnet from default VPC
+data "aws_subnet" "default" {
+  vpc_id            = data.aws_vpc.default.id
+  availability_zone = "${var.aws_region}a"
+  default_for_az    = true
 }
 
 data "aws_caller_identity" "current" {}
