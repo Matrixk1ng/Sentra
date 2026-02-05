@@ -6,7 +6,7 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Sentra - Social Media Sentiment Analysis",
-  description: "Analyze sentiment from social media posts across Reddit and YouTube",
+  description: "Analyze sentiment from social media posts across BlueSky and YouTube (Reddit coming soon!).",
   icons: {
     icon: "/favicon.ico",
   },
