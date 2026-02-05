@@ -8,6 +8,16 @@ echo "Starting user-data script at $(date)"
 # Update system
 yum update -y
 
+# Add swap space (2GB) for t2.micro - prevents OOM when loading ML model
+SWAP_SIZE_GB=2
+echo "Configuring ${SWAP_SIZE_GB}GB swap..."
+dd if=/dev/zero of=/swapfile bs=1M count=$((SWAP_SIZE_GB * 1024)) status=progress
+chmod 600 /swapfile
+mkswap /swapfile
+swapon /swapfile
+echo '/swapfile none swap sw 0 0' >> /etc/fstab
+echo "Swap configured. $(free -h | grep Swap)"
+
 # Install Docker
 yum install -y docker
 systemctl start docker
@@ -32,16 +42,47 @@ POSTGRES_PASSWORD=${postgres_password}
 YOUTUBE_API_KEY=${youtube_api_key}
 BLUESKY_HANDLE=${bluesky_handle}
 BLUESKY_APP_PASSWORD=${bluesky_app_password}
-REDDIT_CLIENT_ID=${reddit_client_id}
-REDDIT_CLIENT_SECRET=${reddit_client_secret}
-REDDIT_USER_AGENT=sentra:v1.0.0
 ENVEOF
+
+# Create Caddyfile for HTTPS
+cat > Caddyfile << 'CADDYEOF'
+sentraai.duckdns.org {
+    handle /health {
+        reverse_proxy backend:8000
+    }
+    handle /search* {
+        reverse_proxy backend:8000
+    }
+    handle /analyze* {
+        reverse_proxy backend:8000
+    }
+    handle /history* {
+        reverse_proxy backend:8000
+    }
+    handle {
+        reverse_proxy frontend:3000
+    }
+}
+CADDYEOF
 
 # Create docker-compose.yml for production
 cat > docker-compose.yml << 'COMPOSEEOF'
-version: '3.8'
-
 services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: sentra-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+      - backend
+
   db:
     image: postgres:15-alpine
     container_name: sentra-db
@@ -62,16 +103,13 @@ services:
     image: ${account_id}.dkr.ecr.${aws_region}.amazonaws.com/sentra-backend:latest
     container_name: sentra-backend
     restart: unless-stopped
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     environment:
       - DATABASE_URL=postgresql://postgres:${postgres_password}@db:5432/sentra
       - YOUTUBE_API_KEY=${youtube_api_key}
       - BLUESKY_HANDLE=${bluesky_handle}
       - BLUESKY_APP_PASSWORD=${bluesky_app_password}
-      - REDDIT_CLIENT_ID=${reddit_client_id}
-      - REDDIT_CLIENT_SECRET=${reddit_client_secret}
-      - REDDIT_USER_AGENT=sentra:v1.0.0
       - HF_HOME=/root/.cache/huggingface
       - TRANSFORMERS_CACHE=/root/.cache/huggingface
     volumes:
@@ -90,16 +128,18 @@ services:
     image: ${account_id}.dkr.ecr.${aws_region}.amazonaws.com/sentra-frontend:latest
     container_name: sentra-frontend
     restart: unless-stopped
-    ports:
-      - "80:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_API_URL=https://sentraai.duckdns.org
+    expose:
+      - "3000"
     depends_on:
       - backend
 
 volumes:
   postgres_data:
   huggingface_cache:
+  caddy_data:
+  caddy_config:
 COMPOSEEOF
 
 # Set ownership

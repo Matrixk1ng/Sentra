@@ -4,13 +4,19 @@ from transformers import pipeline
 
 logger = logging.getLogger(__name__)
 
+# Lightweight model for low-memory environments (e.g. EC2 t2.micro with 1GB RAM).
+# DistilBERT ~250MB vs RoBERTa-base ~500MB+. Outputs POSITIVE/NEGATIVE; we map
+# low-confidence to "neutral" for 3-class API.
+LIGHTWEIGHT_MODEL = "distilbert-base-uncased-finetuned-sst-2-english"
+NEUTRAL_THRESHOLD = 0.15  # If score within ±threshold of 0.5, treat as neutral
+
 
 class SentimentAnalyzer:
     """
     Sentiment analysis service using HuggingFace transformers.
     
-    Uses the cardiffnlp/twitter-roberta-base-sentiment-latest model
-    which outputs: positive, negative, neutral labels with confidence scores.
+    Uses a lightweight DistilBERT model for low-memory (1GB) instances.
+    Outputs: positive, negative, or neutral (when confidence is low).
     """
     
     def __init__(self):
@@ -22,12 +28,11 @@ class SentimentAnalyzer:
         Load the sentiment analysis model.
         Should be called once at application startup.
         """
-        logger.info("Loading sentiment analysis model...")
+        logger.info("Loading sentiment analysis model (lightweight)...")
         try:
             self._classifier = pipeline(
                 "sentiment-analysis",
-                model="cardiffnlp/twitter-roberta-base-sentiment-latest",
-                top_k=None  # Return all labels with scores
+                model=LIGHTWEIGHT_MODEL,
             )
             self._is_loaded = True
             logger.info("Sentiment analysis model loaded successfully")
@@ -41,34 +46,25 @@ class SentimentAnalyzer:
         return self._is_loaded
     
     def _map_label(self, label: str) -> str:
-        """
-        Map model output labels to standard format.
-        The model outputs: 'positive', 'negative', 'neutral'
-        """
-        label_lower = label.lower()
-        if label_lower in ['positive', 'negative', 'neutral']:
-            return label_lower
-        # Fallback mapping for any unexpected labels
-        return 'neutral'
+        """Map model output to lowercase."""
+        return label.lower() if label else "neutral"
     
-    def _get_top_sentiment(self, results: List[dict]) -> Tuple[str, float]:
+    def _get_top_sentiment(self, result: dict) -> Tuple[str, float]:
         """
-        Extract the top sentiment and its score from model output.
-        
-        Args:
-            results: List of dicts with 'label' and 'score' keys
-            
-        Returns:
-            Tuple of (sentiment_label, score)
+        Extract sentiment from model output.
+        DistilBERT-SST-2 returns single label (POSITIVE/NEGATIVE) and score.
+        We map low confidence to 'neutral' for 3-class API.
         """
-        if not results:
-            return 'neutral', 0.0
+        if not result:
+            return "neutral", 0.0
         
-        # Results are already sorted by score (highest first)
-        top_result = results[0]
-        sentiment = self._map_label(top_result['label'])
-        score = round(top_result['score'], 4)
-        return sentiment, score
+        label = self._map_label(result.get("label", "neutral"))
+        score = round(float(result.get("score", 0.5)), 4)
+        
+        # Map uncertain predictions to neutral (score near 0.5)
+        if abs(score - 0.5) < NEUTRAL_THRESHOLD:
+            return "neutral", score
+        return label, score
     
     def analyze_single(self, text: str) -> Tuple[str, float]:
         """
@@ -93,9 +89,10 @@ class SentimentAnalyzer:
         # Truncate very long texts to avoid memory issues
         truncated_text = text[:512] if len(text) > 512 else text
         
-        results = self._classifier(truncated_text)
-        # Results is a list containing a list of label/score dicts
-        return self._get_top_sentiment(results[0] if results else [])
+        result = self._classifier(truncated_text)
+        # Single input returns list of one dict: [{'label': 'POSITIVE', 'score': 0.99}]
+        out = result[0] if isinstance(result, list) and result else (result if isinstance(result, dict) else {})
+        return self._get_top_sentiment(out)
     
     def analyze_batch(self, texts: List[str]) -> List[Tuple[str, float]]:
         """
@@ -130,13 +127,14 @@ class SentimentAnalyzer:
         if not processed_texts:
             raise ValueError("All texts are empty")
         
-        # Batch inference
+        # Batch inference (returns list of dicts, one per input)
         batch_results = self._classifier(processed_texts)
         
-        # Map results back, filling in neutral for empty texts
         results = [('neutral', 0.0)] * len(texts)
-        for idx, result in zip(valid_indices, batch_results):
-            results[idx] = self._get_top_sentiment(result)
+        for idx, raw in zip(valid_indices, batch_results):
+            # Pipeline returns one dict per input: {'label': '...', 'score': ...}
+            item = raw if isinstance(raw, dict) else (raw[0] if isinstance(raw, list) and raw else {})
+            results[idx] = self._get_top_sentiment(item)
         
         return results
 

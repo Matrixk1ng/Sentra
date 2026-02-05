@@ -2,23 +2,24 @@
 resource "aws_security_group" "sentra" {
   name        = "sentra-sg"
   description = "Security group for Sentra application"
+  vpc_id      = data.aws_vpc.default.id
 
   # SSH access
   ingress {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = [var.allowed_ssh_cidr]
+    cidr_blocks = ["0.0.0.0/0"]
     description = "SSH access"
   }
 
-  # HTTP access
+  # HTTP access (redirects to HTTPS)
   ingress {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
-    description = "HTTP access"
+    description = "HTTP access (redirects to HTTPS)"
   }
 
   # HTTPS access
@@ -28,24 +29,6 @@ resource "aws_security_group" "sentra" {
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
     description = "HTTPS access"
-  }
-
-  # Frontend direct access (for testing)
-  ingress {
-    from_port   = 3000
-    to_port     = 3000
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "Frontend direct access"
-  }
-
-  # Backend direct access (for testing)
-  ingress {
-    from_port   = 8000
-    to_port     = 8000
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "Backend direct access"
   }
 
   # All outbound traffic
