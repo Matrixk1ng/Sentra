@@ -17,7 +17,7 @@ A social media sentiment analysis dashboard that aggregates posts from Reddit an
 | Frontend | Next.js 14 (App Router) + Tailwind CSS + shadcn/ui |
 | Backend | FastAPI (Python) |
 | Database | PostgreSQL |
-| AI/NLP | HuggingFace Transformers (cardiffnlp/twitter-roberta-base-sentiment) |
+| AI/NLP | distilbert-base-uncased-finetuned-sst-2-english |
 | Charts | Recharts |
 | Containerization | Docker & Docker Compose |
 
